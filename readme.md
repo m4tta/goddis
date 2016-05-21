@@ -17,7 +17,8 @@ A Partial clone of redis in GO.
 - HMGET
 - HINCRBY
 
-Doesn't respond to INFO
+Does not respond to INFO
+Does not save to disk
 
 ## Testing
 [GoConvey](https://github.com/smartystreets/goconvey) for testing.
