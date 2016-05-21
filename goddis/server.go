@@ -51,8 +51,10 @@ func (g *Goddis) parseCommand(data []byte) (*Command, error) {
 			cmds = append(cmds, s)
 		}
 	}
+	if len(cmds) != 0 {
 	command.command = cmds[0]
 	command.args = cmds[1:]
+	}
 	return command, nil
 }
 
@@ -67,9 +69,11 @@ func (g *Goddis) validCommand(cmd Command) bool {
 	// might allow me to do generic command processor
 	// atleast get it to validate arg count maybe
 	// think of other things
+	// im sure there is a better way to do command processing
 	return false
 }
 
+// TODO: Better command validation
 func (g *Goddis) processCommand(cmd Command) {
 	switch strings.ToUpper(cmd.command) {
 	case "PING":
@@ -78,44 +82,64 @@ func (g *Goddis) processCommand(cmd Command) {
 		if len(cmd.args) > 0 {
 			cmd.client.BulkString(cmd.args[0])
 		} else {
-			err := IncorrectArgs(cmd)
-			cmd.client.Error(err)
+			cmd.client.Error(IncorrectArgs(cmd))
 		}
 	case "EXISTS":
-		cmd.client.SendBool(g.Exists(cmd.args[0]))
+		if len(cmd.args) > 1 {
+			cmd.client.SendBool(g.Exists(cmd.args[0]))
+		} else {
+			cmd.client.Error(IncorrectArgs(cmd));
+		}
 	case "DEL":
 		cmd.client.SendInt(g.Del(cmd.args[0:]...))
 	case "EXPIRE":
-		cmd.client.SendBool(g.Expire(cmd.args[0], cmd.args[1]))
+		if len(cmd.args) > 1 {
+			cmd.client.SendBool(g.Expire(cmd.args[0], cmd.args[1]))
+		} else {
+			cmd.client.Error(IncorrectArgs(cmd));
+		}
 	case "SET":
+		// TODO: Validate syntax for a SET command with optional params
 		if len(cmd.args) > 1 {
 			if ok := g.Set(cmd.args[0], cmd.args[1], cmd.args[2:]...); ok {
 				cmd.client.Ok()
 			} else {
-				cmd.client.SendNull()
+				cmd.client.SyntaxError()
 			}
 		} else {
 			cmd.client.Error(IncorrectArgs(cmd))
 		}
 	case "INCR":
-		i, err := g.Incr(cmd.args[0])
-		if err != nil {
-			cmd.client.Error(err.Error())
+		if len(cmd.args) == 1 {
+			i, err := g.Incr(cmd.args[0])
+			if err != nil {
+				cmd.client.Error(err.Error())
+			} else {
+				cmd.client.SendInt(i)
+			}
 		} else {
-			cmd.client.SendInt(i)
+			cmd.client.Error(IncorrectArgs(cmd));
 		}
 	case "INCRBY":
-		i, err := g.IncrBy(cmd.args[0], cmd.args[1])
-		if err != nil {
-			cmd.client.Error(err.Error())
+		if len(cmd.args) == 2 {
+			i, err := g.IncrBy(cmd.args[0], cmd.args[1])
+			if err != nil {
+				cmd.client.Error(err.Error())
+			} else {
+				cmd.client.SendInt(i)
+			}
 		} else {
-			cmd.client.SendInt(i)
+			cmd.client.Error(IncorrectArgs(cmd));
 		}
 	case "GET":
-		if value, ok := g.Get(cmd.args[0]); ok {
-			cmd.client.BulkString(value)
+		if len(cmd.args) == 1 {
+			if value, ok := g.Get(cmd.args[0]); ok {
+				cmd.client.BulkString(value)
+			} else {
+				cmd.client.SendNull()
+			}
 		} else {
-			cmd.client.SendNull()
+			cmd.client.Error(IncorrectArgs(cmd));
 		}
 	case "MGET":
 		if len(cmd.args) >= 1 {
@@ -125,10 +149,14 @@ func (g *Goddis) processCommand(cmd Command) {
 			cmd.client.Error(IncorrectArgs(cmd))
 		}
 	case "HSET":
-		if ok := g.HSet(cmd.args[0], cmd.args[1], cmd.args[2]); ok {
-			cmd.client.SendBool(true)
+		if len(cmd.args) == 3 {
+			if ok := g.HSet(cmd.args[0], cmd.args[1], cmd.args[2]); ok {
+				cmd.client.SendBool(true)
+			} else {
+				cmd.client.SendBool(false)
+			}
 		} else {
-			cmd.client.SendBool(false)
+			cmd.client.Error(IncorrectArgs(cmd));
 		}
 	case "HGET":
 		if len(cmd.args) == 2 {
@@ -149,11 +177,15 @@ func (g *Goddis) processCommand(cmd Command) {
 			cmd.client.Error(IncorrectArgs(cmd))
 		}
 	case "HINCRBY":
-		i, err := g.HIncrBy(cmd.args[0], cmd.args[1], cmd.args[2])
-		if err != nil {
-			cmd.client.Error(err.Error())
+		if len(cmd.args) == 3 {
+			i, err := g.HIncrBy(cmd.args[0], cmd.args[1], cmd.args[2])
+			if err != nil {
+				cmd.client.Error(err.Error())
+			} else {
+				cmd.client.SendInt(i)
+			}
 		} else {
-			cmd.client.SendInt(i)
+			cmd.client.Error(IncorrectArgs(cmd))
 		}
 	default:
 		cmd.client.Error(UnknownCmd(cmd))
@@ -165,7 +197,11 @@ func IncorrectArgs(cmd Command) string {
 }
 
 func UnknownCmd(cmd Command) string {
-	return "unknown command '" + cmd.command + "'"
+	if cmd.command != "" {
+		return "unknown command '" + cmd.command + "'"
+	} else {
+		return "No command"
+	}
 }
 
 func (g *Goddis) marshalChannels(cmdChan <-chan Command, addChan <-chan Client, rmChan <-chan Client) {

@@ -25,6 +25,14 @@ func (c *Client) Error(s string) {
 	c.Write("-ERR " + s + "\r\n")
 }
 
+func (c *Client) NoCmdError() {
+	c.Write("-ERR No command\r\n")
+}
+
+func (c *Client) SyntaxError() {
+	c.Write("-ERR syntax error\r\n")
+}
+
 func (c *Client) ErrorType(s string) {
 	c.Write("-WRONGTYPE " + s + "\r\n")
 }

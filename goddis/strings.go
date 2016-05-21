@@ -18,11 +18,9 @@ func (g *Goddis) Set(key, value string, modifiers ...string) (ok bool) {
 		mod = strings.ToUpper(mod)
 		if mod == "NX" {
 			NX = true
-		}
-		if mod == "XX" {
+		} else if mod == "XX" {
 			XX = true
-		}
-		if mod == "EX" {
+		} else if mod == "EX" {
 			hasEx = true
 			if i+1 < len(modifiers) {
 				EX, _ = strconv.Atoi(modifiers[i+1])
@@ -31,8 +29,7 @@ func (g *Goddis) Set(key, value string, modifiers ...string) (ok bool) {
 				ok = false
 				return
 			}
-		}
-		if mod == "PX" {
+		} else if mod == "PX" {
 			hasPx = true
 			if i+1 < len(modifiers) {
 				PX, _ = strconv.Atoi(modifiers[i+1])
